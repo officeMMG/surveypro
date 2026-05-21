@@ -238,7 +238,7 @@ export function InstrumentField({ value, onChange }: InstrumentFieldProps) {
 
         {/* No. 選択（複数ある場合はプルダウン、1つなら表示のみ） */}
         {nosForName.length > 1 ? (
-          <Select value={selectedNo} onValueChange={handleNoChange}>
+          <Select value={selectedNo} onValueChange={(v) => v && handleNoChange(v)}>
             <SelectTrigger className="h-8 text-xs w-28">
               <SelectValue placeholder="No." />
             </SelectTrigger>

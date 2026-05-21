@@ -1,36 +1,68 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# SurveyPro — 測量現場支援システム
 
-## Getting Started
+公共測量作業規程準拠の水準測量データ管理・計算・出力Webアプリケーション
 
-First, run the development server:
+## 技術スタック
+
+- **フロントエンド**: Next.js 15 (App Router) + Tailwind CSS + shadcn/ui
+- **DB**: Supabase (PostgreSQL) + Prisma ORM
+- **認証**: NextAuth.js v5 (Google + メール/PW)
+- **OCR**: Anthropic Claude API (サーバーサイドのみ)
+- **エラー監視**: Sentry
+- **デプロイ**: Vercel
+
+## クイックスタート
 
 ```bash
+git clone https://github.com/your-org/surveypro.git
+cd surveypro
+cp .env.example .env.local   # 環境変数を設定
+npm install
+npx prisma db push
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 必要な環境変数
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+`.env.example` を参照してください。最低限必要なもの:
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| 変数名 | 生成方法 |
+|--------|---------|
+| `NEXTAUTH_SECRET` | `openssl rand -base64 32` |
+| `ENCRYPTION_KEY` | `openssl rand -hex 32` |
+| `DATABASE_URL` | Supabase Dashboard |
+| `GOOGLE_CLIENT_ID/SECRET` | Google Cloud Console |
+| `ANTHROPIC_API_KEY` | console.anthropic.com |
 
-## Learn More
+## セキュリティ
 
-To learn more about Next.js, take a look at the following resources:
+- `ANTHROPIC_API_KEY` はサーバーサイドのみで使用。クライアントには公開しない
+- ユーザーのAPIキーはAES-256-GCMで暗号化してDBに保存
+- `ENCRYPTION_KEY` は `.env.local` / Vercel環境変数で管理し、コードにハードコードしない
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## 機能
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### Phase 1（実装済み）
+- 現場管理（6ヶ月自動削除・容量上限削除）
+- 水準測量野帳（直接入力 + 写真OCR）
+- 器械高式・昇降式自動計算
+- 制限値判定 1〜4級（公共測量作業規程第34条）
+- CSVエクスポート（現場・路線単位）
+- 点の記データ管理
+- チーム機能（オーナー/編集者/閲覧者）
 
-## Deploy on Vercel
+### Phase 2（Coming Soon）
+- トラバース計算・座標計算・面積計算・丁張計算
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Vercelデプロイ
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```bash
+npm i -g vercel
+vercel link
+vercel env pull .env.local   # 環境変数を同期
+vercel --prod
+```
+
+## 準拠規程
+
+公共測量作業規程（令和2年3月 国土交通省告示第367号）第32〜34条

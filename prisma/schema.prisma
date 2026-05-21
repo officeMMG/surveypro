@@ -1,0 +1,266 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── 認証（NextAuth.js v5） ───────────────────────────────────────────────────
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  password      String?
+  role          UserRole  @default(MEMBER)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  accounts        Account[]
+  sessions        Session[]
+  apiKeys         UserApiKey[]
+  projectMembers  ProjectMember[]
+  ownedProjects   Project[]       @relation("ProjectOwner")
+  benchmarks      Benchmark[]
+  contactRequests ContactRequest[]
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ─── APIキー管理（暗号化保存） ────────────────────────────────────────────────
+
+model UserApiKey {
+  id           String    @id @default(cuid())
+  userId       String
+  provider     String
+  encryptedKey String
+  keyHint      String
+  isActive     Boolean   @default(true)
+  lastTestedAt DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, provider])
+}
+
+// ─── 現場管理 ────────────────────────────────────────────────────────────────
+
+model Project {
+  id            String     @id @default(cuid())
+  name          String
+  client        String?
+  routeName     String?
+  workStartDate DateTime?
+  workEndDate   DateTime?
+  gradeLevel    GradeLevel @default(LEVEL_3)
+  ownerId       String
+  autoDeleteAt  DateTime
+  deletedAt     DateTime?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  owner          User            @relation("ProjectOwner", fields: [ownerId], references: [id])
+  members        ProjectMember[]
+  levelingRoutes LevelingRoute[]
+  benchmarks     Benchmark[]
+}
+
+model ProjectMember {
+  id        String     @id @default(cuid())
+  projectId String
+  userId    String
+  role      MemberRole @default(VIEWER)
+  createdAt DateTime   @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, userId])
+}
+
+// ─── 水準測量 ────────────────────────────────────────────────────────────────
+
+model LevelingRoute {
+  id         String         @id @default(cuid())
+  projectId  String
+  name       String
+  direction  RouteDirection @default(FORWARD)
+  surveyDate DateTime?
+  weather    String?
+  instrument String?
+  observer   String?
+  recorder   String?
+  note       String?
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+
+  project  Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  readings LevelingReading[]
+  result   LevelingResult?
+}
+
+model LevelingReading {
+  id             String   @id @default(cuid())
+  routeId        String
+  sequence       Int
+  stationName    String
+  bs             Decimal? @db.Decimal(8, 3)
+  fs             Decimal? @db.Decimal(8, 3)
+  is_            Decimal? @db.Decimal(8, 3)
+  ih             Decimal? @db.Decimal(8, 3)
+  gh             Decimal? @db.Decimal(8, 3)
+  rise           Decimal? @db.Decimal(8, 3)
+  fall           Decimal? @db.Decimal(8, 3)
+  distance       Decimal? @db.Decimal(8, 3)
+  note           String?
+  isKnown        Boolean  @default(false)
+  knownElevation Decimal? @db.Decimal(10, 4)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  route LevelingRoute @relation(fields: [routeId], references: [id], onDelete: Cascade)
+
+  @@unique([routeId, sequence])
+}
+
+model LevelingResult {
+  id             String   @id @default(cuid())
+  routeId        String   @unique
+  totalBs        Decimal? @db.Decimal(8, 3)
+  totalFs        Decimal? @db.Decimal(8, 3)
+  closureError   Decimal? @db.Decimal(8, 4)
+  totalDistance  Decimal? @db.Decimal(10, 3)
+  allowableError Decimal? @db.Decimal(8, 4)
+  isPassed       Boolean?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  route LevelingRoute @relation(fields: [routeId], references: [id], onDelete: Cascade)
+}
+
+// ─── 点の記 ────────────────────────────────────────────────────────────────
+
+model Benchmark {
+  id            String        @id @default(cuid())
+  projectId     String
+  userId        String
+  code          String
+  name          String?
+  type          BenchmarkType @default(FOUR_ORDER)
+  latitudeDeg   Decimal?      @db.Decimal(11, 8)
+  longitudeDeg  Decimal?      @db.Decimal(11, 8)
+  elevation     Decimal?      @db.Decimal(10, 4)
+  establishedAt DateTime?
+  managingOrg   String?
+  location      String?
+  guideMapUrl   String?
+  photoUrl      String?
+  note          String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id])
+
+  @@unique([projectId, code])
+}
+
+// ─── 管理者問い合わせ ─────────────────────────────────────────────────────────
+
+model ContactRequest {
+  id         String             @id @default(cuid())
+  userId     String
+  type       ContactRequestType @default(API_KEY_CHANGE)
+  message    String
+  status     ContactStatus      @default(PENDING)
+  createdAt  DateTime           @default(now())
+  resolvedAt DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ─── Enums ──────────────────────────────────────────────────────────────────
+
+enum UserRole {
+  ADMIN
+  MEMBER
+}
+
+enum MemberRole {
+  OWNER
+  EDITOR
+  VIEWER
+}
+
+enum GradeLevel {
+  LEVEL_1
+  LEVEL_2
+  LEVEL_3
+  LEVEL_4
+}
+
+enum RouteDirection {
+  FORWARD
+  BACKWARD
+  LOOP
+  JUNCTION
+}
+
+enum BenchmarkType {
+  FIRST_ORDER
+  SECOND_ORDER
+  THIRD_ORDER
+  FOUR_ORDER
+  ELECTRONIC
+}
+
+enum ContactRequestType {
+  API_KEY_CHANGE
+  ACCOUNT_ISSUE
+  OTHER
+}
+
+enum ContactStatus {
+  PENDING
+  IN_PROGRESS
+  RESOLVED
+}

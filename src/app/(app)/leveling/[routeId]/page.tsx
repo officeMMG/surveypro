@@ -35,6 +35,7 @@ interface RouteInfo {
   observer: string
   recorder: string
   grade: GradeLevel
+  direction: RouteDirection
 }
 
 export default function LevelingRoutePage() {
@@ -43,7 +44,7 @@ export default function LevelingRoutePage() {
   const [result, setResult] = useState<LevelingCalculationResult | null>(null)
   const [routeInfo, setRouteInfo] = useState<RouteInfo>({
     name: "", surveyDate: "", weather: "", instrument: "",
-    observer: "", recorder: "", grade: "LEVEL_3",
+    observer: "", recorder: "", grade: "LEVEL_3", direction: "FORWARD",
   })
   const [saving, setSaving] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -63,6 +64,7 @@ export default function LevelingRoutePage() {
           observer: data.route.observer ?? "",
           recorder: data.route.recorder ?? "",
           grade: data.route.project?.gradeLevel ?? "LEVEL_3",
+          direction: data.route.direction ?? "FORWARD",
         })
       })
       .catch(() => toast.error("データの読み込みに失敗しました"))

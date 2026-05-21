@@ -6,8 +6,9 @@ import { Label } from "@/components/ui/label"
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select"
-import { GRADE_LABELS } from "@/types"
-import type { GradeLevel } from "@prisma/client"
+import { GRADE_LABELS, DIRECTION_LABELS } from "@/types"
+import type { GradeLevel, RouteDirection } from "@prisma/client"
+import { InstrumentField } from "./instrument-field"
 
 interface RouteInfo {
   name: string
@@ -17,6 +18,7 @@ interface RouteInfo {
   observer: string
   recorder: string
   grade: GradeLevel
+  direction: RouteDirection
 }
 
 interface RouteInfoFormProps {
@@ -72,12 +74,22 @@ export function RouteInfoForm({ value, onChange }: RouteInfoFormProps) {
             </Select>
           </div>
           <div className="space-y-1">
-            <Label className="text-xs">使用機器</Label>
-            <Input
+            <Label className="text-xs">往路・復路</Label>
+            <Select value={value.direction} onValueChange={(v) => v && set("direction", v)}>
+              <SelectTrigger className="h-8 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {Object.entries(DIRECTION_LABELS).map(([k, v]) => (
+                  <SelectItem key={k} value={k} className="text-xs">{v}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="col-span-2">
+            <InstrumentField
               value={value.instrument}
-              onChange={(e) => set("instrument", e.target.value)}
-              placeholder="例: Leica NA730"
-              className="h-8 text-xs"
+              onChange={(v) => set("instrument", v)}
             />
           </div>
           <div className="space-y-1">

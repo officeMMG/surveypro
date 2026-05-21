@@ -26,6 +26,7 @@ model User {
   ownedProjects   Project[]       @relation("ProjectOwner")
   benchmarks      Benchmark[]
   contactRequests ContactRequest[]
+  instruments     Instrument[]
 }
 
 model Account {
@@ -205,6 +206,17 @@ model Benchmark {
 }
 
 // ─── 管理者問い合わせ ─────────────────────────────────────────────────────────
+
+model Instrument {
+  id        String   @id @default(cuid())
+  userId    String
+  name      String
+  number    String
+  user      User     @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@unique([userId, name, number])
+}
 
 model ContactRequest {
   id         String             @id @default(cuid())

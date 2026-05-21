@@ -14,6 +14,11 @@ import {
 } from "@/components/ui/dialog"
 import { cn } from "@/lib/utils"
 import { Plus, Ruler, ChevronRight, CheckCircle2, AlertTriangle, Clock } from "lucide-react"
+import { DIRECTION_LABELS } from "@/types"
+import type { RouteDirection } from "@prisma/client"
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select"
 import Link from "next/link"
 import { formatDistanceToNow } from "date-fns"
 import { ja } from "date-fns/locale"
@@ -36,6 +41,7 @@ export default function ProjectPage() {
   const [routes, setRoutes] = useState<Route[]>([])
   const [loading, setLoading] = useState(true)
   const [newRouteName, setNewRouteName] = useState("")
+  const [newDirection, setNewDirection] = useState<RouteDirection>("FORWARD")
   const [creating, setCreating] = useState(false)
   const [dialogOpen, setDialogOpen] = useState(false)
 
@@ -54,7 +60,7 @@ export default function ProjectPage() {
       const res = await fetch(`/api/projects/${projectId}/routes`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: newRouteName }),
+        body: JSON.stringify({ name: newRouteName, direction: newDirection }),
       })
       if (!res.ok) throw new Error()
       const { id } = await res.json()
@@ -95,6 +101,19 @@ export default function ProjectPage() {
                     onKeyDown={(e) => e.key === "Enter" && handleCreate()}
                     autoFocus
                   />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>往路・復路</Label>
+                  <Select value={newDirection} onValueChange={(v) => v && setNewDirection(v as RouteDirection)}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(DIRECTION_LABELS).map(([k, v]) => (
+                        <SelectItem key={k} value={k}>{v}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <Button onClick={handleCreate} disabled={creating || !newRouteName.trim()} className="w-full">
                   {creating ? "作成中..." : "作成して開く"}

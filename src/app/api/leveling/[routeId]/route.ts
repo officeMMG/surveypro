@@ -48,6 +48,7 @@ const putSchema = z.object({
     instrument: z.string().optional(),
     observer: z.string().optional(),
     recorder: z.string().optional(),
+    direction: z.enum(["FORWARD", "BACKWARD", "LOOP", "JUNCTION"]).optional(),
   }),
   rows: z.array(z.any()),
   result: z.any().optional(),
@@ -71,6 +72,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ rout
         instrument: routeInfo.instrument,
         observer: routeInfo.observer,
         recorder: routeInfo.recorder,
+        ...(routeInfo.direction && { direction: routeInfo.direction }),
       },
     })
 

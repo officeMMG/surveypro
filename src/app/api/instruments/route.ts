@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(instrument)
   } catch (err) {
     if (err instanceof z.ZodError) {
-      return NextResponse.json({ error: err.errors[0].message }, { status: 400 })
+      return NextResponse.json({ error: err.issues[0].message }, { status: 400 })
     }
     return NextResponse.json({ error: "既に同じ機器No.が登録されています" }, { status: 409 })
   }

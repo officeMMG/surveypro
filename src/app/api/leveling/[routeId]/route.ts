@@ -4,12 +4,13 @@ import { db } from "@/lib/db"
 import { z } from "zod"
 import type { LevelingRow } from "@/types"
 
-export async function GET(req: NextRequest, { params }: { params: { routeId: string } }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ routeId: string }> }) {
   const session = await auth()
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
+  const { routeId } = await params
   const route = await db.levelingRoute.findUnique({
-    where: { id: params.routeId },
+    where: { id: routeId },
     include: {
       project: { select: { gradeLevel: true } },
       readings: { orderBy: { sequence: "asc" } },
@@ -52,16 +53,17 @@ const putSchema = z.object({
   result: z.any().optional(),
 })
 
-export async function PUT(req: NextRequest, { params }: { params: { routeId: string } }) {
+export async function PUT(req: NextRequest, { params }: { params: Promise<{ routeId: string }> }) {
   const session = await auth()
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
+  const { routeId } = await params
   try {
     const body = await req.json()
     const { routeInfo, rows, result } = putSchema.parse(body)
 
     await db.levelingRoute.update({
-      where: { id: params.routeId },
+      where: { id: routeId },
       data: {
         name: routeInfo.name,
         surveyDate: routeInfo.surveyDate ? new Date(routeInfo.surveyDate) : null,
@@ -73,10 +75,10 @@ export async function PUT(req: NextRequest, { params }: { params: { routeId: str
     })
 
     // 既存の読み取りデータを削除して再作成
-    await db.levelingReading.deleteMany({ where: { routeId: params.routeId } })
+    await db.levelingReading.deleteMany({ where: { routeId } })
     await db.levelingReading.createMany({
       data: rows.map((r: LevelingRow, i: number) => ({
-        routeId: params.routeId,
+        routeId,
         sequence: i,
         stationName: r.stationName || `No.${i + 1}`,
         bs: r.bs ? parseFloat(r.bs) : null,
@@ -96,9 +98,9 @@ export async function PUT(req: NextRequest, { params }: { params: { routeId: str
     // 計算結果を更新
     if (result) {
       await db.levelingResult.upsert({
-        where: { routeId: params.routeId },
+        where: { routeId },
         create: {
-          routeId: params.routeId,
+          routeId,
           totalBs: result.totalBs,
           totalFs: result.totalFs,
           closureError: result.closureError,

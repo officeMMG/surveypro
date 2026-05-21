@@ -2,12 +2,13 @@ import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { db } from "@/lib/db"
 
-export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth()
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
+  const { id } = await params
   const project = await db.project.findUnique({
-    where: { id: params.id },
+    where: { id },
     include: { members: true },
   })
 
@@ -19,7 +20,7 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
   }
 
   await db.project.update({
-    where: { id: params.id },
+    where: { id },
     data: { deletedAt: new Date() },
   })
 

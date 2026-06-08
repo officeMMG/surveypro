@@ -2,21 +2,18 @@
 
 import { useState, useEffect, useCallback } from "react"
 import { useParams } from "next/navigation"
-import { useSession } from "next-auth/react"
 import { toast } from "sonner"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
 import { Header } from "@/components/layout/header"
 import { FieldbookTable } from "@/components/leveling/fieldbook-table"
 import { OcrUpload } from "@/components/leveling/ocr-upload"
 import { ResultSummary } from "@/components/leveling/result-summary"
 import { RouteInfoForm } from "@/components/leveling/route-info-form"
-import { runLevelingCalculation } from "@/lib/calculations/leveling"
 import { buildLevelingCsv, downloadCsv } from "@/lib/calculations/csv"
 import type { LevelingRow, LevelingCalculationResult } from "@/types"
 import type { GradeLevel, RouteDirection } from "@prisma/client"
-import { Save, Download, AlertTriangle } from "lucide-react"
+import { Save, Download, AlertTriangle, Calculator } from "lucide-react"
 
 const INITIAL_ROWS: LevelingRow[] = Array.from({ length: 8 }, (_, i) => ({
   sequence: i,
@@ -24,7 +21,7 @@ const INITIAL_ROWS: LevelingRow[] = Array.from({ length: 8 }, (_, i) => ({
   ih: "", gh: "", rise: "", fall: "",
   distance: "", note: "",
   isKnown: i === 0,
-  knownElevation: i === 0 ? "" : "",
+  knownElevation: "",
 }))
 
 interface RouteInfo {
@@ -47,9 +44,9 @@ export default function LevelingRoutePage() {
     observer: "", recorder: "", grade: "LEVEL_3", direction: "FORWARD",
   })
   const [saving, setSaving] = useState(false)
+  const [calculating, setCalculating] = useState(false)
   const [loading, setLoading] = useState(true)
 
-  // ルートデータ読み込み
   useEffect(() => {
     if (routeId === "new") { setLoading(false); return }
     fetch(`/api/leveling/${routeId}`)
@@ -66,28 +63,70 @@ export default function LevelingRoutePage() {
           grade: data.route.project?.gradeLevel ?? "LEVEL_3",
           direction: data.route.direction ?? "FORWARD",
         })
+        if (data.result) {
+          setResult({
+            rows: data.readings ?? [],
+            totalBs: Number(data.result.totalBs ?? 0),
+            totalFs: Number(data.result.totalFs ?? 0),
+            closureError: Number(data.result.closureError ?? 0),
+            totalDistance: Number(data.result.totalDistance ?? 0),
+            allowableError: Number(data.result.allowableError ?? 0),
+            isPassed: data.result.isPassed ?? false,
+            problemRows: [],
+          })
+        }
       })
       .catch(() => toast.error("データの読み込みに失敗しました"))
       .finally(() => setLoading(false))
   }, [routeId])
 
-  // リアルタイム計算
-  useEffect(() => {
-    if (rows.some((r) => r.bs || r.fs)) {
-      const res = runLevelingCalculation(rows, routeInfo.grade)
-      setRows(res.rows)
-      setResult(res)
-      if (!res.isPassed) {
-        toast.warning("閉合差が制限値を超過しています。要再測箇所を確認してください。", {
-          id: "closure-warning",
-          duration: 5000,
-        })
-      }
+  const handleCalculate = async () => {
+    const hasData = rows.some((r) => r.bs || r.fs)
+    if (!hasData) {
+      toast.warning("後視・前視を入力してから計算してください")
+      return
     }
-  }, [rows.map((r) => `${r.bs}|${r.fs}|${r.is_}|${r.isKnown}|${r.knownElevation}`).join(","), routeInfo.grade])
+    setCalculating(true)
+    try {
+      const res = await fetch(`/api/leveling/${routeId}/calculate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rows, grade: routeInfo.grade }),
+      })
+      if (!res.ok) {
+        const err = await res.json()
+        throw new Error(err.error ?? "計算に失敗しました")
+      }
+      const data = await res.json()
+      const { summary } = data
+
+      setRows(data.rows)
+      setResult({
+        rows: data.rows,
+        totalBs: summary.totalBs,
+        totalFs: summary.totalFs,
+        closureError: summary.closureError,
+        totalDistance: summary.totalDistanceKm,
+        allowableError: summary.allowableError / 1000,
+        isPassed: summary.isPassed,
+        problemRows: summary.problemRows ?? [],
+      })
+
+      if (!summary.isPassed) {
+        toast.warning("閉合差が制限値を超過しています。要再測箇所を確認してください。")
+      } else {
+        toast.success("計算が完了しました")
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "計算に失敗しました")
+    } finally {
+      setCalculating(false)
+    }
+  }
 
   const handleOcrResult = useCallback((ocrRows: LevelingRow[]) => {
     setRows(ocrRows)
+    setResult(null)
   }, [])
 
   const handleSave = async () => {
@@ -138,10 +177,8 @@ export default function LevelingRoutePage() {
       <Header title="水準測量野帳" />
       <div className="flex-1 overflow-y-auto">
         <div className="max-w-[1400px] mx-auto p-6 space-y-4">
-          {/* 路線情報 */}
           <RouteInfoForm value={routeInfo} onChange={setRouteInfo} />
 
-          {/* 野帳入力 */}
           <Tabs defaultValue="direct">
             <div className="flex items-center justify-between">
               <TabsList>
@@ -155,6 +192,16 @@ export default function LevelingRoutePage() {
                     閉合差超過 — 要再測
                   </div>
                 )}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleCalculate}
+                  disabled={calculating}
+                  className="gap-1.5 text-xs"
+                >
+                  <Calculator className="w-3.5 h-3.5" />
+                  {calculating ? "計算中..." : "計算実行"}
+                </Button>
                 <Button
                   variant="outline"
                   size="sm"
@@ -205,7 +252,6 @@ export default function LevelingRoutePage() {
             </TabsContent>
           </Tabs>
 
-          {/* 計算結果 */}
           {result && (
             <ResultSummary result={result} grade={routeInfo.grade} rows={rows} />
           )}

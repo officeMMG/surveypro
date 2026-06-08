@@ -21,7 +21,6 @@ model User {
 
   accounts        Account[]
   sessions        Session[]
-  apiKeys         UserApiKey[]
   projectMembers  ProjectMember[]
   ownedProjects   Project[]       @relation("ProjectOwner")
   benchmarks      Benchmark[]
@@ -63,24 +62,6 @@ model VerificationToken {
   expires    DateTime
 
   @@unique([identifier, token])
-}
-
-// ─── APIキー管理（暗号化保存） ────────────────────────────────────────────────
-
-model UserApiKey {
-  id           String    @id @default(cuid())
-  userId       String
-  provider     String
-  encryptedKey String
-  keyHint      String
-  isActive     Boolean   @default(true)
-  lastTestedAt DateTime?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, provider])
 }
 
 // ─── 現場管理 ────────────────────────────────────────────────────────────────

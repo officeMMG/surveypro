@@ -82,7 +82,8 @@ export async function uploadFileToDify(file: File, userId: string): Promise<stri
 export async function runOcr(fileId: string, userId: string): Promise<DifyOcrResult> {
   const result = (await runWorkflow(
     {
-      image: {
+      survey: "ocr",
+      files: {
         transfer_method: "local_file",
         upload_file_id: fileId,
         type: "image",
@@ -102,7 +103,7 @@ export async function runLevelingCalc(
   userId: string,
 ): Promise<DifyCalcResult> {
   const result = (await runWorkflow(
-    { grade, rows_json: JSON.stringify(rows) },
+    { survey: "leveling", query: JSON.stringify(rows), grade },
     userId,
   )) as { ok: boolean; rows: LevelingRow[]; summary: DifyCalcSummary; error?: string }
 
